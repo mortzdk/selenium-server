@@ -18,7 +18,7 @@ unameOut="$(uname -s)"
 case "${unameOut}" in
     Linux*)     PLATFORM="linux" PLATFORM_NAME="linux"; EXT="";;
     Darwin*)    PLATFORM="mac" PLATFORM_NAME="mac" EXT="";;
-    CYGWIN*)    PLATFORM="win"; PLATFORM_NAME="windows" EXT=".exe";;
+    CYGWIN*)    PLATFORM="win"; PLATFORM_NAME="windows"; EXT=".exe"; DIR=".";;
     *)          echo "ERROR: Unsupported platform '$unameOut'." >&2; exit 1
 esac
 
@@ -162,6 +162,8 @@ function check_selenium {
     done
 
     semver_version "$current_version" "SELENIUM_VERSION"
+
+    echo "Using selenium version $SELENIUM_VERSION"
     
     if ! [[ -f $DIR/jars/selenium-server-standalone-$SELENIUM_VERSION.jar ]]; then
         wget --no-verbose -O "$DIR/jars/selenium-server-standalone-$SELENIUM_VERSION.jar" "https://selenium-release.storage.googleapis.com/$MAJOR.$MINOR/selenium-server-standalone-$SELENIUM_VERSION.jar"
@@ -179,7 +181,7 @@ function check_chrome {
 
     if [[ $PLATFORM = "win" ]]
     then
-        CHROME_STRING=$(echo "\n" | powershell.exe -command "Get-ItemProperty HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall | % { Get-ItemProperty \$_.PsPath } | Select DisplayName, DisplayVersion, InstallLocation | ForEach-Object { \$_.DisplayName + ';' + \$_.DisplayVersion + ';' + \$_.InstallLocation }" | grep -i "google chrome")
+        CHROME_STRING=$(echo "\n" | powershell.exe -command "Get-ItemProperty HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | % { Get-ItemProperty \$_.PsPath } | Select DisplayName, DisplayVersion, InstallLocation | ForEach-Object { \$_.DisplayName + ';' + \$_.DisplayVersion + ';' + \$_.InstallLocation }" | grep -i "google chrome")
         if [[ -z $CHROME_STRING ]] || [[ -n $CHROME_STRING ]]; then
             return
         fi
@@ -249,7 +251,7 @@ function check_firefox {
     local FIREFOX_STRING=""
     if [[ $PLATFORM = "win" ]]
     then
-        FIREFOX_STRING=$(echo "\n" | powershell.exe -command "Get-ItemProperty HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall | % { Get-ItemProperty \$_.PsPath } | Select DisplayName, DisplayVersion, InstallLocation | ForEach-Object { \$_.DisplayName + ';' + \$_.DisplayVersion + ';' + \$_.InstallLocation }" | grep -i "mozilla firefox")
+        FIREFOX_STRING=$(echo "\n" | powershell.exe -command "Get-ItemProperty HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | % { Get-ItemProperty \$_.PsPath } | Select DisplayName, DisplayVersion, InstallLocation | ForEach-Object { \$_.DisplayName + ';' + \$_.DisplayVersion + ';' + \$_.InstallLocation }" | grep -i "mozilla firefox")
         if [[ -z $FIREFOX_STRING ]] || [[ -n $FIREFOX_STRING ]]; then
             return
         fi
@@ -443,14 +445,14 @@ function check_ie {
     echo "Using iedriver version $ID_VERSION"
     echo "For Internet Explore version: $IE_VERSION_STRING"
 
-    if ! [[ -f "$DIR/drivers/iedriver-$GK_VERSION.exe" ]]; then
+    if ! [[ -f "$DIR/drivers/iedriver-$ID_VERSION.exe" ]]; then
         wget --no-verbose -O "/tmp/IEDriverServer_${IE_ARCH}_$ID_VERSION.zip" "https://selenium-release.storage.googleapis.com/$MAJOR.$MINOR/IEDriverServer_${IE_ARCH}_$ID_VERSION.zip"
         rm -f "$DIR/drivers/iedriver.exe"
         unzip "/tmp/IEDriverServer_${IE_ARCH}_$ID_VERSION.zip" -d "$DIR/drivers"
         rm "/tmp/IEDriverServer_${IE_ARCH}_$ID_VERSION.zip"
-        mv "$DIR/drivers/IEDriverServer.exe" "$DIR/drivers/iedriver-$GK_VERSION.exe"
-        chmod 755 "$DIR/drivers/iedriver-$GK_VERSION.exe"
-        ln -fs "$DIR/drivers/iedriver-$GK_VERSION.exe" "$DIR/drivers/iedriver.exe"
+        mv "$DIR/drivers/IEDriverServer.exe" "$DIR/drivers/iedriver-$ID_VERSION.exe"
+        chmod 755 "$DIR/drivers/iedriver-$ID_VERSION.exe"
+        ln -fs "$DIR/drivers/iedriver-$ID_VERSION.exe" "$DIR/drivers/iedriver.exe"
     fi
 
     local cap=$(cat <<-END
