@@ -5,12 +5,13 @@
 #
 # Distributed under terms of the MIT license.
 #
-# TODO: support role standalone
+# TODO: IEdriver follows selinium driver versions
 
 # DEFAULT VALUES
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 DEBUG="false"
 ADDRESS="0.0.0.0"
+JAVA_ARGS=""
 
 # Get platform script is running on
 unameOut="$(uname -s)"
@@ -40,7 +41,7 @@ if [ $# -eq 0 ]; then
 fi
 
 # Parse options to script
-while getopts a:j:p:c:shni option
+while getopts a:j:p:c:shnid option
 do
 case "${option}"
 in
@@ -176,7 +177,17 @@ function check_chrome {
     local CHROME_MAYOR_VERSION=""
     local CHROME_DRIVER_VERSION=""
 
-    if [[ -x "$(command -v 'google-chrome')" ]]
+    if [[ $PLATFORM = "win" ]]
+    then
+        CHROME_STRING=$(echo "\n" | powershell.exe -command "Get-ItemProperty HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall | % { Get-ItemProperty \$_.PsPath } | Select DisplayName, DisplayVersion, InstallLocation | ForEach-Object { \$_.DisplayName + ';' + \$_.DisplayVersion + ';' + \$_.InstallLocation }" | grep -i "google chrome")
+        if [[ -z $CHROME_STRING ]] || [[ -n $CHROME_STRING ]]; then
+            return
+        fi
+
+        IFS=';' read -ra DATA <<< "$CHROME_STRING"
+        CHROME_STRING=${DATA[1]}
+        CHROME_PATH="${DATA[2]}\\chrome.exe"
+    elif [[ -x "$(command -v 'google-chrome')" ]]
     then
         CHROME_PATH=$(which google-chrome)
         CHROME_STRING=$($CHROME_PATH --version)
@@ -202,8 +213,9 @@ function check_chrome {
         CHROME_DRIVER_VERSION="${CD_VERSION}"; 
     fi 
     CD_VERSION=$(echo $CHROME_DRIVER_VERSION)
-    echo "Using chromedriver version: "$CD_VERSION
-    if [ ! -f "$DIR/drivers/chromedriver-$CD_VERSION$EXT" ]; then
+    echo "Using chromedriver version: $CD_VERSION"
+    echo "For chrome version: $CHROME_VERSION"
+    if [ ! -f "$DIR/drivers/chromedriver-$CD_VERSION" ]; then
         wget --no-verbose -O "/tmp/chromedriver_${PLATFORM}${ARCH}.zip" "https://chromedriver.storage.googleapis.com/$CD_VERSION/chromedriver_${PLATFORM}${ARCH}.zip"
         rm -f "$DIR/drivers/chromedriver$EXT"
         unzip "/tmp/chromedriver_${PLATFORM}${ARCH}.zip" -d "$DIR/drivers"
@@ -220,27 +232,45 @@ function check_chrome {
         \"platformName\": \"$PLATFORM_NAME\",
         \"maxInstances\": 5,
         \"seleniumProtocol\": \"WebDriver\",
-        \"applicationName\": \"$NAME\"
+        \"applicationName\": \"$NAME\",
+        \"chromeOptions\": {
+            \"binary\" : \"$CHROME_PATH\"
+        }
     },
 END
 )
     eval "$1+=\"$cap\""
+    eval "$2+=\"-Dwebdriver.chrome.driver=$DIR/drivers/chromedriver$EXT -Dwebdriver.chrome.logfile=$DIR/logs/chromedriver.log -Dwebdriver.chrome.verboseLogging=true \""
 }
 
 # Check if firefox is installed, download corresponding driver and generate
 # capabilities.
 function check_firefox {
-    if ! [[ -x "$(command -v 'firefox')" ]]
+    local FIREFOX_STRING=""
+    if [[ $PLATFORM = "win" ]]
     then
+        FIREFOX_STRING=$(echo "\n" | powershell.exe -command "Get-ItemProperty HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall | % { Get-ItemProperty \$_.PsPath } | Select DisplayName, DisplayVersion, InstallLocation | ForEach-Object { \$_.DisplayName + ';' + \$_.DisplayVersion + ';' + \$_.InstallLocation }" | grep -i "mozilla firefox")
+        if [[ -z $FIREFOX_STRING ]] || [[ -n $FIREFOX_STRING ]]; then
+            return
+        fi
+
+        IFS=';' read -ra DATA <<< "$FIREFOX_STRING"
+        FIREFOX_STRING=${DATA[1]}
+        FIREFOX_PATH="${DATA[2]}\\firefox.exe"
+    elif [[ -x "$(command -v 'firefox')" ]]
+    then
+        FIREFOX_PATH=$(which firefox)
+        FIREFOX_STRING=`$FIREFOX_PATH --version`
+    else
         return
     fi
 
-    FIREFOX_PATH=$(which firefox)
-    semver_version `$FIREFOX_PATH --version` "FIREFOX_VERSION"
+    semver_version "$FIREFOX_STRING" "FIREFOX_VERSION"
 
     semver_version `curl --silent "https://api.github.com/repos/mozilla/geckodriver/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'` "GK_VERSION"
 
     echo "Using GeckoDriver version: "$GK_VERSION
+    echo "For Firfox version: $FIREFOX_VERSION"
     if [ ! -f "$DIR/drivers/geckodriver-$GK_VERSION$EXT" ]; then
         wget --no-verbose -O "/tmp/geckodriver.tar.gz" "https://github.com/mozilla/geckodriver/releases/download/v$GK_VERSION/geckodriver-v$GK_VERSION-${PLATFORM}${ARCH}.tar.gz"
         rm -f "$DIR/drivers/geckodriver$EXT"
@@ -269,18 +299,24 @@ function check_firefox {
 END
 )
     eval "$1+=\"$cap\""
+    eval "$2+=\"-Dwebdriver.firefox.bin=$FIREFOX_PATH -Dwebdriver.gecko.driver=$DIR/drivers/geckodriver$EXT -Dwebdriver.firefox.logfile=$DIR/logs/geckodriver.log \""
 }
 
 # Check if opera is installed, download corresponding driver and generate
 # capabilities.
 function check_opera {
-    if ! [[ -x "$(command -v 'opera')" ]]
+    local OPERA_STRING=""
+    if [[ $PLATFORM = "win" ]]
     then
+        return
+    elif [[ -x "$(command -v 'opera')" ]]
+    then
+        OPERA_PATH=$(which opera)
+        OPERA_STRING=""$($OPERA_PATH --version)
+    else
         return
     fi
 
-    OPERA_PATH=$(which opera)
-    local OPERA_STRING=$($OPERA_PATH --version)
     local OPERA_VERSION_STRING=$(echo "$OPERA_STRING" | grep -oP "\d+\.\d+\.\d+\.\d+")
 
     compare_versions "$OPERA_VERSION_STRING" "12.15"
@@ -289,6 +325,7 @@ function check_opera {
         semver_version `curl --silent "https://api.github.com/repos/operasoftware/operachromiumdriver/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'` "OD_VERSION"
 
         echo "Using OperaChromiumDriver version: "$OD_VERSION
+        echo "For Opera version: $OPERA_VERSION_STRING"
 
         if [ ! -f "$DIR/drivers/operachromiumdriver-$OD_VERSION$EXT" ]; then
             wget --no-verbose -O "/tmp/operachromiumdriver_${PLATFORM}${ARCH}.zip" "https://github.com/operasoftware/operachromiumdriver/releases/download/v.$OD_VERSION/operadriver_${PLATFORM}${ARCH}.zip"
@@ -311,13 +348,150 @@ function check_opera {
         \"platformName\": \"$PLATFORM_NAME\",
         \"maxInstances\": 5,
         \"seleniumProtocol\": \"WebDriver\",
+        \"applicationName\": \"$NAME\",
+        \"operaOptions\": {
+            \"binary\" : \"$OPERA_PATH\"
+        }
+    },
+END
+)
+
+    eval "$1+=\"$cap\""
+    eval "$2+=\"-Dwebdriver.opera.driver=$DIR/drivers/operachromiumdriver$EXT -Dwebdriver.opera.logfile=$DIR/logs/operachromiumdriver.log -Dwebdriver.opera.verboseLogging=true \""
+}
+
+#function check_safari {
+#    if [[ -x "$(command -v 'safari')" ]]
+#    then
+#        SAFARI_PATH=$(which safari)
+#        SAFARI_STRING="$($SAFARI_PATH --version)"
+#
+#        semver_version "$SAFARI_STRING" "SAFARI_VERSION_STRING"
+#        compare_versions "$SAFARI_VERSION_STRING" "10"
+#        
+#        if [[ "$?" = "1" ]] || [[ "$?" = "0" ]]; then
+#            if ! [[ -f "/usr/bin/safaridriver" ]]; then
+#                return
+#            fi
+#            echo "Using /usr/bin/safaridriver"
+#            echo "For Safari version: $SAFARI_VERSION_STRING"
+#            /usr/bin/safaridriver
+#        else
+#            #TODO Old safari driver
+#            return
+#        fi
+#    else
+#        return
+#    fi
+#
+#    local cap=$(cat <<-END
+#    {
+#        \"version\": \"$OPERA_VERSION_STRING\",
+#        \"browserName\": \"safari\",
+#        \"platformName\": \"$PLATFORM_NAME\",
+#        \"maxInstances\": 5,
+#        \"seleniumProtocol\": \"WebDriver\",
+#        \"applicationName\": \"$NAME\"
+#    },
+#END
+#)
+#
+#    eval "$1+=\"$cap\""
+#    eval "$2+=\"-Dwebdriver.safari.driver=/usr/bin/safaridriver \""
+#}
+
+function check_ie {
+    local IE_STRING=""
+    local IE_ARCH=""
+    if [[ $PLATFORM = "win" ]]
+    then
+        IE_STRING=`echo "\n" | powershell.exe -command "(Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Internet Explorer').SvcVersion"`
+        if [[ -z $IE_STRING ]]; then
+            IE_STRING=`echo "\n" | powershell.exe -command "(Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Internet Explorer').Version"`
+            if [[ -z $IE_STRING ]]; then
+                return
+            fi
+        fi
+    else
+        return
+    fi
+
+    semver_version "$IE_STRING" "IE_VERSION_STRING"
+
+    wget -q --no-verbose -O /tmp/SELENIUM_RELEASE "https://selenium-release.storage.googleapis.com/"
+    if [[ "$ARCH" == "32" ]]; then
+        IE_ARCH="Win32"
+    else
+        IE_ARCH="x64"
+    fi
+    local versions=`cat /tmp/SELENIUM_RELEASE | grep -Po "IEDriverServer_${IE_ARCH}_[\d+][\.\d+]*zip"`
+    rm /tmp/SELENIUM_RELEASE 
+    semver_version "$versions[0]" "current_version"
+    for v in $versions
+    do
+        semver_version "$v" "ver"
+        compare_versions "$ver" "$current_version"
+
+		if [[ "$?" = "1" ]];
+		then
+			current_version=$ver
+		fi
+    done
+
+    semver_version "$current_version" "ID_VERSION"
+
+    echo "Using iedriver version $ID_VERSION"
+    echo "For Internet Explore version: $IE_VERSION_STRING"
+
+    if ! [[ -f "$DIR/drivers/iedriver-$GK_VERSION.exe" ]]; then
+        wget --no-verbose -O "/tmp/IEDriverServer_${IE_ARCH}_$ID_VERSION.zip" "https://selenium-release.storage.googleapis.com/$MAJOR.$MINOR/IEDriverServer_${IE_ARCH}_$ID_VERSION.zip"
+        rm -f "$DIR/drivers/iedriver.exe"
+        unzip "/tmp/IEDriverServer_${IE_ARCH}_$ID_VERSION.zip" -d "$DIR/drivers"
+        rm "/tmp/IEDriverServer_${IE_ARCH}_$ID_VERSION.zip"
+        mv "$DIR/drivers/IEDriverServer.exe" "$DIR/drivers/iedriver-$GK_VERSION.exe"
+        chmod 755 "$DIR/drivers/iedriver-$GK_VERSION.exe"
+        ln -fs "$DIR/drivers/iedriver-$GK_VERSION.exe" "$DIR/drivers/iedriver.exe"
+    fi
+
+    local cap=$(cat <<-END
+    {
+        \"version\": \"$IE_VERSION_STRING\",
+        \"browserName\": \"internet explorer\",
+        \"platformName\": \"$PLATFORM_NAME\",
+        \"maxInstances\": 5,
+        \"seleniumProtocol\": \"WebDriver\",
         \"applicationName\": \"$NAME\"
     },
 END
 )
 
     eval "$1+=\"$cap\""
+    eval "$2+=\"-Dwebdriver.ie.driver=$DIR/drivers/iedriver.exe -Dwebdriver.ie.driver.logfile=$DIR/logs/iedriver.log -Dwebdriver.ie.driver.loglevel=TRACE \""
 }
+
+#function check_edge {
+#    if [[ $PLATFORM = "win" ]]
+#    then
+#        return
+#    else
+#        return
+#    fi
+#
+#    local cap=$(cat <<-END
+#    {
+#        \"version\": \"$EDGE_VERSION_STRING\",
+#        \"browserName\": \"edge\",
+#        \"platformName\": \"$PLATFORM_NAME\",
+#        \"maxInstances\": 5,
+#        \"seleniumProtocol\": \"WebDriver\",
+#        \"applicationName\": \"$NAME\"
+#    },
+#END
+#)
+#
+#    eval "$1+=\"$cap\""
+#    eval "$2+=\"-Dwebdriver.edge.driver=$DIR/drivers/edgedriver.exe \""
+#}
 
 is_installed "arch"
 is_installed "java"
@@ -355,9 +529,13 @@ if [[ $ROLE = "node" ]]; then
 END
 );
 
-        check_chrome "CONF"
-        check_firefox "CONF"
-        check_opera "CONF"
+        check_chrome "CONF" "JAVA_ARGS"
+        check_firefox "CONF" "JAVA_ARGS"
+        check_opera "CONF" "JAVA_ARGS"
+        #check_safari "CONF" "JAVA_ARGS"
+        check_ie "CONF" "JAVA_ARGS"
+        #check_edge "CONF" "JAVA_ARGS"
+
         CONF=${CONF%?};
         CONF+="]}"
 
@@ -403,6 +581,7 @@ END
     fi
 fi
 
+# Generate standalone config parameter
 if [[ $ROLE = "standalone" ]]; then
     if [[ -z $PORT ]]; then
         PORT="4444"
@@ -422,9 +601,13 @@ if [[ $ROLE = "standalone" ]]; then
 END
 );
 
-        check_chrome "CONF"
-        check_firefox "CONF"
-        check_opera "CONF"
+        check_chrome "CONF" "JAVA_ARGS"
+        check_firefox "CONF" "JAVA_ARGS"
+        check_opera "CONF" "JAVA_ARGS"
+        #check_safari "CONF" "JAVA_ARGS"
+        check_ie "CONF" "JAVA_ARGS"
+        #check_edge "CONF" "JAVA_ARGS"
+
         CONF=${CONF%?};
         CONF+="]}"
         echo $CONF > "$DIR/configs/$ROLE.config.json"
@@ -455,4 +638,5 @@ else
 fi
 
 semver_version "$JAR" "SELENIUM_VERSION"
-java -jar $JAR -role $ROLE -log $DIR/logs/$NAME-server-$SELENIUM_VERSION.log -host $ADDRESS -port $PORT $CONFIG $DEBUG $HUB
+java $JAVA_ARGS-jar "$JAR" -role "$ROLE" -log "$DIR/logs/$NAME-server-$SELENIUM_VERSION.log" -host "$ADDRESS" -port "$PORT" $CONFIG $DEBUG $HUB
+#echo "java $JAVA_ARGS-jar $JAR -role $ROLE -log $DIR/logs/$NAME-server-$SELENIUM_VERSION.log -host $ADDRESS -port $PORT $CONFIG $DEBUG $HUB"
