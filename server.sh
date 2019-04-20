@@ -188,7 +188,7 @@ function check_chrome {
 
         IFS=';' read -ra DATA <<< "$CHROME_STRING"
         CHROME_STRING=${DATA[1]}
-        CHROME_PATH="${DATA[2]}\\chrome.exe"
+        CHROME_PATH="$(echo ${DATA[2]} | sed $'s/\r//')\\chrome.exe"
     elif [[ -x "$(command -v 'google-chrome')" ]]
     then
         CHROME_PATH=$(which google-chrome)
@@ -258,7 +258,7 @@ function check_firefox {
 
         IFS=';' read -ra DATA <<< "$FIREFOX_STRING"
         FIREFOX_STRING=${DATA[1]}
-        FIREFOX_PATH="${DATA[2]}\\firefox.exe"
+        FIREFOX_PATH="$(echo ${DATA[2]} | sed $'s/\r//')\\firefox.exe"
     elif [[ -x "$(command -v 'firefox')" ]]
     then
         FIREFOX_PATH=$(which firefox)
@@ -500,6 +500,7 @@ is_installed "java"
 is_installed "wget"
 is_installed "unzip"
 is_installed "tar"
+is_installed "sed"
 
 # Generate nodeConfig parameter
 if [[ $ROLE = "node" ]]; then
