@@ -236,7 +236,7 @@ function check_chrome {
         \"seleniumProtocol\": \"WebDriver\",
         \"applicationName\": \"$NAME\",
         \"chromeOptions\": {
-            \"binary\" : \"$CHROME_PATH\"
+            \"binary\" : \"$(echo $CHROME_PATH | sed -e 's/\\/\\\\/g')\"
         }
     },
 END
@@ -352,7 +352,7 @@ function check_opera {
         \"seleniumProtocol\": \"WebDriver\",
         \"applicationName\": \"$NAME\",
         \"operaOptions\": {
-            \"binary\" : \"$OPERA_PATH\"
+            \"binary\" : \"$(echo $OPERA_PATH | sed -e 's/\\/\\\\/g')\"
         }
     },
 END
