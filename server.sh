@@ -58,7 +58,7 @@ esac
 done
 
 # If neither node or hub parameter were given throw error and show info 
-if [[ -z $ROLE ]]; then
+if [[ -z "$ROLE" ]]; then
     echo "ERROR: Either -s, -n or -h must be used to specify whether server should run in standalone, node or hub mode" >&2
     echo ""
     show_info
@@ -182,7 +182,7 @@ function check_chrome {
     if [[ $PLATFORM = "win" ]]
     then
         CHROME_STRING=$(echo "\n" | powershell.exe -command "Get-ItemProperty HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | % { Get-ItemProperty \$_.PsPath } | Select DisplayName, DisplayVersion, InstallLocation | ForEach-Object { \$_.DisplayName + ';' + \$_.DisplayVersion + ';' + \$_.InstallLocation }" | grep -i "google chrome")
-        if [[ -z $CHROME_STRING ]] || [[ -n $CHROME_STRING ]]; then
+        if [[ -z "${CHROME_STRING// }" ]]; then
             return
         fi
 
@@ -252,7 +252,7 @@ function check_firefox {
     if [[ $PLATFORM = "win" ]]
     then
         FIREFOX_STRING=$(echo "\n" | powershell.exe -command "Get-ItemProperty HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | % { Get-ItemProperty \$_.PsPath } | Select DisplayName, DisplayVersion, InstallLocation | ForEach-Object { \$_.DisplayName + ';' + \$_.DisplayVersion + ';' + \$_.InstallLocation }" | grep -i "mozilla firefox")
-        if [[ -z $FIREFOX_STRING ]] || [[ -n $FIREFOX_STRING ]]; then
+        if [[ -z "${FIREFOX_STRING// }" ]]; then
             return
         fi
 
@@ -408,9 +408,9 @@ function check_ie {
     if [[ $PLATFORM = "win" ]]
     then
         IE_STRING=`echo "\n" | powershell.exe -command "(Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Internet Explorer').SvcVersion"`
-        if [[ -z $IE_STRING ]]; then
+        if [[ -z "${IE_STRING// }" ]]; then
             IE_STRING=`echo "\n" | powershell.exe -command "(Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Internet Explorer').Version"`
-            if [[ -z $IE_STRING ]]; then
+            if [[ -z "${IE_STRING// }" ]]; then
                 return
             fi
         fi
@@ -503,11 +503,11 @@ is_installed "tar"
 
 # Generate nodeConfig parameter
 if [[ $ROLE = "node" ]]; then
-    if [[ -z $PORT ]]; then
+    if [[ -z "$PORT" ]]; then
         PORT="5555"
     fi
 
-    if [[ -z $CONFIG ]]; then
+    if [[ -z "$CONFIG" ]]; then
         CONF=$(cat <<-END 
         {
             "proxy": "org.openqa.grid.selenium.proxy.DefaultRemoteProxy",
@@ -551,11 +551,11 @@ fi
 
 # Generate hubConfig parameter
 if [[ $ROLE = "hub" ]]; then
-    if [[ -z $PORT ]]; then
+    if [[ -z "$PORT" ]]; then
         PORT="4444"
     fi
 
-    if [[ -z $CONFIG ]]; then
+    if [[ -z "$CONFIG" ]]; then
         CONF=$(cat <<-END
         {
             "host": "$ADDRESS",
@@ -585,11 +585,11 @@ fi
 
 # Generate standalone config parameter
 if [[ $ROLE = "standalone" ]]; then
-    if [[ -z $PORT ]]; then
+    if [[ -z "$PORT" ]]; then
         PORT="4444"
     fi
 
-    if [[ -z $CONFIG ]]; then
+    if [[ -z "$CONFIG" ]]; then
         CONF=$(cat <<-END
         {
             "host": "$ADDRESS",
@@ -620,13 +620,13 @@ END
 fi
 
 # If jar is not defined find the newest selenium jar
-if [[ -z $JAR ]];
+if [[ -z "$JAR" ]];
 then
     check_selenium "JAR"
 fi
 
 # Generate hub parameter based on HUB value
-if [[ -z $HUB ]]; then
+if [[ -z "$HUB" ]]; then
     HUB=""
 else
     HUB="-hub $HUB"
@@ -641,4 +641,3 @@ fi
 
 semver_version "$JAR" "SELENIUM_VERSION"
 java $JAVA_ARGS-jar "$JAR" -role "$ROLE" -log "$DIR/logs/$NAME-server-$SELENIUM_VERSION.log" -host "$ADDRESS" -port "$PORT" $CONFIG $DEBUG $HUB
-#echo "java $JAVA_ARGS-jar $JAR -role $ROLE -log $DIR/logs/$NAME-server-$SELENIUM_VERSION.log -host $ADDRESS -port $PORT $CONFIG $DEBUG $HUB"
