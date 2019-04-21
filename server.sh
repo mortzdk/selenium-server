@@ -281,8 +281,14 @@ function check_firefox {
     if [ ! -f "$DIR/drivers/geckodriver-$GK_VERSION$EXT" ]; then
         wget --no-verbose -O "/tmp/geckodriver.$COMP_EXT" "https://github.com/mozilla/geckodriver/releases/download/v$GK_VERSION/geckodriver-v$GK_VERSION-${PLATFORM}${ARCH}.$COMP_EXT"
         rm -f "$DIR/drivers/geckodriver$EXT"
-        tar -C "$DIR/drivers" -zxf "/tmp/geckodriver.$COMP_EXT"
-        rm "/tmp/geckodriver.$COMP_EXT"
+        if [[ "$COMP_EXT" = "zip" ]]; then
+            unzip "/tmp/geckodriver.$COMP_EXT" -d "$DIR/drivers"
+            tar -C "$DIR/drivers" -zxf "/tmp/geckodriver.$COMP_EXT"
+            rm "/tmp/geckodriver.$COMP_EXT"
+        else
+            tar -C "$DIR/drivers" -zxf "/tmp/geckodriver.$COMP_EXT"
+            rm "/tmp/geckodriver.$COMP_EXT"
+        fi
         mv "$DIR/drivers/geckodriver$EXT" "$DIR/drivers/geckodriver-$GK_VERSION$EXT"
         chmod 755 "$DIR/drivers/geckodriver-$GK_VERSION$EXT"
         ln -fs "$DIR/drivers/geckodriver-$GK_VERSION$EXT" "$DIR/drivers/geckodriver$EXT"
