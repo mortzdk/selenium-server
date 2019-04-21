@@ -71,7 +71,7 @@ NAME="selenium-$ROLE"
 function is_installed()
 {
     if ! [ -x "$(command -v $1)" ]; then
-        echo "ERROR: '$1' is not installed." >&2
+        echo "☒ $1"
         exit 1
     fi
 }
@@ -227,6 +227,7 @@ function check_chrome {
         ln -fs "$DIR/drivers/chromedriver-$CD_VERSION$EXT" "$DIR/drivers/chromedriver$EXT"
     fi
 
+    local ESCAPED_CHROME_PATH=$(jq -aR . <<< "$CHROME_PATH")
     local cap=$(cat <<-END
     {
         \"version\": \"$CHROME_VERSION\",
@@ -234,9 +235,9 @@ function check_chrome {
         \"platformName\": \"$PLATFORM_NAME\",
         \"maxInstances\": 5,
         \"seleniumProtocol\": \"WebDriver\",
-        \"applicationName\": \"$NAME\",
+        \"applicationName\": \"$NAME-chrome\",
         \"chromeOptions\": {
-            \"binary\" : \"$(echo $CHROME_PATH | sed -e 's/\\/\\\\/g')\"
+            \"binary\" : $(echo $ESCAPED_CHROME_PATH | sed -e 's/\\/\\\\/g'| sed -e 's/"/\\"/g')
         }
     },
 END
@@ -272,7 +273,7 @@ function check_firefox {
     semver_version `curl --silent "https://api.github.com/repos/mozilla/geckodriver/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'` "GK_VERSION"
 
     echo "Using GeckoDriver version: "$GK_VERSION
-    echo "For Firfox version: $FIREFOX_VERSION"
+    echo "For Firefox version: $FIREFOX_VERSION"
     if [ ! -f "$DIR/drivers/geckodriver-$GK_VERSION$EXT" ]; then
         wget --no-verbose -O "/tmp/geckodriver.tar.gz" "https://github.com/mozilla/geckodriver/releases/download/v$GK_VERSION/geckodriver-v$GK_VERSION-${PLATFORM}${ARCH}.tar.gz"
         rm -f "$DIR/drivers/geckodriver$EXT"
@@ -296,7 +297,7 @@ function check_firefox {
                 \"level\": \"trace\"
             }
         },
-        \"applicationName\": \"$NAME\"
+        \"applicationName\": \"$NAME-firefox\"
     },
 END
 )
@@ -343,6 +344,7 @@ function check_opera {
         return
     fi
 
+    local ESCAPED_OPERA_PATH=$(jq -aR . <<< "$OPERA_PATH")
     local cap=$(cat <<-END
     {
         \"version\": \"$OPERA_VERSION_STRING\",
@@ -350,9 +352,9 @@ function check_opera {
         \"platformName\": \"$PLATFORM_NAME\",
         \"maxInstances\": 5,
         \"seleniumProtocol\": \"WebDriver\",
-        \"applicationName\": \"$NAME\",
+        \"applicationName\": \"$NAME-opera\",
         \"operaOptions\": {
-            \"binary\" : \"$(echo $OPERA_PATH | sed -e 's/\\/\\\\/g')\"
+            \"binary\" : $(echo $ESCAPED_OPERA_PATH | sed -e 's/\\/\\\\/g'| sed -e 's/"/\\"/g')
         }
     },
 END
@@ -393,7 +395,7 @@ END
 #        \"platformName\": \"$PLATFORM_NAME\",
 #        \"maxInstances\": 5,
 #        \"seleniumProtocol\": \"WebDriver\",
-#        \"applicationName\": \"$NAME\"
+#        \"applicationName\": \"$NAME-safari\"
 #    },
 #END
 #)
@@ -462,7 +464,7 @@ function check_ie {
         \"platformName\": \"$PLATFORM_NAME\",
         \"maxInstances\": 5,
         \"seleniumProtocol\": \"WebDriver\",
-        \"applicationName\": \"$NAME\"
+        \"applicationName\": \"$NAME-ie\"
     },
 END
 )
@@ -486,7 +488,7 @@ END
 #        \"platformName\": \"$PLATFORM_NAME\",
 #        \"maxInstances\": 5,
 #        \"seleniumProtocol\": \"WebDriver\",
-#        \"applicationName\": \"$NAME\"
+#        \"applicationName\": \"$NAME-edge\"
 #    },
 #END
 #)
@@ -495,15 +497,28 @@ END
 #    eval "$2+=\"-Dwebdriver.edge.driver=$DIR/drivers/edgedriver.exe \""
 #}
 
+echo "========================== Checking Required Programs =========================="
+
 is_installed "arch"
+echo "☑ arch"
 is_installed "java"
+echo "☑ java"
 is_installed "wget"
+echo "☑ wget"
 is_installed "unzip"
+echo "☑ unzip"
 is_installed "tar"
+echo "☑ tar"
 is_installed "sed"
+echo "☑ sed"
+is_installed "jq"
+echo "☑ jq"
+
 
 # Generate nodeConfig parameter
 if [[ $ROLE = "node" ]]; then
+    echo "========================== Generating configurations =========================="
+
     if [[ -z "$PORT" ]]; then
         PORT="5555"
     fi
@@ -523,7 +538,6 @@ if [[ $ROLE = "node" ]]; then
             "role": "$ROLE",
             "unregisterIfStillDownAfter": 60000,
             "downPollingLimit": 2,
-            "debug": false,
             "servlets" : [],
             "withoutServlets": [],
             "custom": {},
@@ -586,6 +600,8 @@ fi
 
 # Generate standalone config parameter
 if [[ $ROLE = "standalone" ]]; then
+    echo "========================== Generating configurations =========================="
+
     if [[ -z "$PORT" ]]; then
         PORT="4444"
     fi
@@ -620,6 +636,8 @@ END
     fi
 fi
 
+echo "========================== Checking Selenium JAR =========================="
+
 # If jar is not defined find the newest selenium jar
 if [[ -z "$JAR" ]];
 then
@@ -640,5 +658,6 @@ else
     DEBUG=""
 fi
 
+echo "========================== Server type: $ROLE =========================="
 semver_version "$JAR" "SELENIUM_VERSION"
 java $JAVA_ARGS-jar "$JAR" -role "$ROLE" -log "$DIR/logs/$NAME-server-$SELENIUM_VERSION.log" -host "$ADDRESS" -port "$PORT" $CONFIG $DEBUG $HUB
