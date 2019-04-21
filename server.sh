@@ -262,6 +262,7 @@ function check_firefox {
         IFS=';' read -ra DATA <<< "$FIREFOX_STRING"
         FIREFOX_STRING=${DATA[1]}
         FIREFOX_PATH="$(echo ${DATA[2]} | sed $'s/\r//')\\firefox.exe"
+        FIREFOX_PATH=$(echo $FIREFOX_PATH | sed -e 's/\\/\/g' | sed -e 's/C:/\/cygdrive\/c/g')
         COMP_EXT="zip"
     elif [[ -x "$(command -v 'firefox')" ]]
     then
@@ -283,7 +284,6 @@ function check_firefox {
         rm -f "$DIR/drivers/geckodriver$EXT"
         if [[ "$COMP_EXT" = "zip" ]]; then
             unzip "/tmp/geckodriver.$COMP_EXT" -d "$DIR/drivers"
-            tar -C "$DIR/drivers" -zxf "/tmp/geckodriver.$COMP_EXT"
             rm "/tmp/geckodriver.$COMP_EXT"
         else
             tar -C "$DIR/drivers" -zxf "/tmp/geckodriver.$COMP_EXT"
@@ -311,6 +311,7 @@ function check_firefox {
     },
 END
 )
+
     eval "$1+=\"$cap\""
     eval "$2+=\"-Dwebdriver.firefox.bin=$FIREFOX_PATH -Dwebdriver.gecko.driver=$DIR/drivers/geckodriver$EXT -Dwebdriver.firefox.logfile=$DIR/logs/geckodriver.log \""
 }
