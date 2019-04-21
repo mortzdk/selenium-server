@@ -250,6 +250,8 @@ END
 # capabilities.
 function check_firefox {
     local FIREFOX_STRING=""
+    local COMP_EXT="tar.gz"
+
     if [[ $PLATFORM = "win" ]]
     then
         FIREFOX_STRING=$(echo "\n" | powershell.exe -command "Get-ItemProperty HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | % { Get-ItemProperty \$_.PsPath } | Select DisplayName, DisplayVersion, InstallLocation | ForEach-Object { \$_.DisplayName + ';' + \$_.DisplayVersion + ';' + \$_.InstallLocation }" | grep -i "mozilla firefox")
@@ -260,6 +262,7 @@ function check_firefox {
         IFS=';' read -ra DATA <<< "$FIREFOX_STRING"
         FIREFOX_STRING=${DATA[1]}
         FIREFOX_PATH="$(echo ${DATA[2]} | sed $'s/\r//')\\firefox.exe"
+        COMP_EXT="zip"
     elif [[ -x "$(command -v 'firefox')" ]]
     then
         FIREFOX_PATH=$(which firefox)
@@ -274,11 +277,12 @@ function check_firefox {
 
     echo "Using GeckoDriver version: "$GK_VERSION
     echo "For Firefox version: $FIREFOX_VERSION"
+
     if [ ! -f "$DIR/drivers/geckodriver-$GK_VERSION$EXT" ]; then
-        wget --no-verbose -O "/tmp/geckodriver.tar.gz" "https://github.com/mozilla/geckodriver/releases/download/v$GK_VERSION/geckodriver-v$GK_VERSION-${PLATFORM}${ARCH}.tar.gz"
+        wget --no-verbose -O "/tmp/geckodriver.$COMP_EXT" "https://github.com/mozilla/geckodriver/releases/download/v$GK_VERSION/geckodriver-v$GK_VERSION-${PLATFORM}${ARCH}.$COMP_EXT"
         rm -f "$DIR/drivers/geckodriver$EXT"
-        tar -C "$DIR/drivers" -zxf "/tmp/geckodriver.tar.gz"
-        rm "/tmp/geckodriver.tar.gz"
+        tar -C "$DIR/drivers" -zxf "/tmp/geckodriver.$COMP_EXT"
+        rm "/tmp/geckodriver.$COMP_EXT"
         mv "$DIR/drivers/geckodriver$EXT" "$DIR/drivers/geckodriver-$GK_VERSION$EXT"
         chmod 755 "$DIR/drivers/geckodriver-$GK_VERSION$EXT"
         ln -fs "$DIR/drivers/geckodriver-$GK_VERSION$EXT" "$DIR/drivers/geckodriver$EXT"
