@@ -270,7 +270,7 @@ function check_firefox {
 
     semver_version "$FIREFOX_STRING" "FIREFOX_VERSION"
 
-    semver_version `curl --silent "https://api.github.com/repos/mozilla/geckodriver/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'` "GK_VERSION"
+    semver_version `wget -qO- "https://api.github.com/repos/mozilla/geckodriver/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'` "GK_VERSION"
 
     echo "Using GeckoDriver version: "$GK_VERSION
     echo "For Firefox version: $FIREFOX_VERSION"
@@ -325,7 +325,7 @@ function check_opera {
     compare_versions "$OPERA_VERSION_STRING" "12.15"
     if [[ "$?" = "1" ]];
     then
-        semver_version `curl --silent "https://api.github.com/repos/operasoftware/operachromiumdriver/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'` "OD_VERSION"
+        semver_version `wget -qO- "https://api.github.com/repos/operasoftware/operachromiumdriver/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'` "OD_VERSION"
 
         echo "Using OperaChromiumDriver version: "$OD_VERSION
         echo "For Opera version: $OPERA_VERSION_STRING"
