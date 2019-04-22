@@ -1,11 +1,40 @@
 #! /bin/bash
 #
 # server.sh
+#
+# Script for starting selenium server node, hub, or standalone on Linux, MacOS, 
+# and Window (Cygwin).
+#
+# The script requires that the following programs are installed:
+# * arch
+# * java
+# * wget
+# * unzip
+# * tar
+# * sed
+# * jq
+#
+# If no configuration file is specifically given, the script will generate an
+# appropriate configuration file for the server. Moreover the script will 
+# download and use the latest version of the chrome, opera, gecko, ie, safari,
+# and edge drivers, along with the newest version of the selenium server. Each
+# driver will be available from the 'drivers' folder, and will only be 
+# downloaded once.
+#
+# All logs will be stored in the 'logs' folder.
+#
+# Known issues:
+# * On Windows (CygWin) the path to the firefox binary must be set using the
+#   system environment PATH, which in turn means that only one instance of
+#   firefox can be run for each selenium-server.
+# * The IE driver follows the selenium versioning meaning that the driver will
+#   probably only work for the specific version of the selenium JAR.
+# * Multiple versions of browsers can be installed on the OS. There should be
+#   a way to setup multiple of the same browser instance.
+#
 # Copyright (C) 2019 Morten Houmøller Nygaard <mortzdk@gmail.com>
 #
 # Distributed under terms of the MIT license.
-#
-# TODO: IEdriver follows selinium driver versions
 
 # DEFAULT VALUES
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -16,8 +45,8 @@ JAVA_ARGS=""
 # Get platform script is running on
 unameOut="$(uname -s)"
 case "${unameOut}" in
-    Linux*)     PLATFORM="linux" PLATFORM_NAME="linux"; EXT="";;
-    Darwin*)    PLATFORM="mac" PLATFORM_NAME="mac" EXT="";;
+    Linux*)     PLATFORM="linux"; PLATFORM_NAME="linux"; EXT="";;
+    Darwin*)    PLATFORM="mac"; PLATFORM_NAME="mac"; EXT="";;
     CYGWIN*)    PLATFORM="win"; PLATFORM_NAME="windows"; EXT=".exe"; DIR=".";;
     *)          echo "ERROR: Unsupported platform '$unameOut'." >&2; exit 1
 esac
@@ -261,8 +290,9 @@ function check_firefox {
 
         IFS=';' read -ra DATA <<< "$FIREFOX_STRING"
         FIREFOX_STRING=${DATA[1]}
-        FIREFOX_PATH="$(echo ${DATA[2]} | sed $'s/\r//')\\firefox.exe"
-        FIREFOX_PATH=$(echo $FIREFOX_PATH | sed -e 's/\\/\/g' | sed -e 's/C:/\/cygdrive\/c/g')
+        FIREFOX_PATH="$(echo ${DATA[2]} | sed $'s/\r//')"
+        FIREFOX_PATH=$(echo $FIREFOX_PATH | sed -e 's/\\/\//g' | sed -e 's/C:/\/cygdrive\/c/g' | sed -e 's/ /\\ /g' | sed -e 's/(/\\(/g' | sed -e 's/)/\\)/g')
+        export PATH=$PATH:$FIREFOX_PATH
         COMP_EXT="zip"
     elif [[ -x "$(command -v 'firefox')" ]]
     then
@@ -313,7 +343,12 @@ END
 )
 
     eval "$1+=\"$cap\""
-    eval "$2+=\"-Dwebdriver.firefox.bin=$FIREFOX_PATH -Dwebdriver.gecko.driver=$DIR/drivers/geckodriver$EXT -Dwebdriver.firefox.logfile=$DIR/logs/geckodriver.log \""
+    eval "$2+=\"-Dwebdriver.gecko.driver=$DIR/drivers/geckodriver$EXT -Dwebdriver.firefox.logfile=$DIR/logs/geckodriver.log \""
+
+    if [[ $PLATFORM != "win" ]]
+    then
+        eval"$2+=\"-Dwebdriver.firefox.bin='$FIREFOX_PATH' \""
+    fi
 }
 
 # Check if opera is installed, download corresponding driver and generate
@@ -671,4 +706,8 @@ fi
 
 echo "========================== Server type: $ROLE =========================="
 semver_version "$JAR" "SELENIUM_VERSION"
+
+echo "========================== Running Command: =========================="
+echo java $JAVA_ARGS-jar "$JAR" -role "$ROLE" -log "$DIR/logs/$NAME-server-$SELENIUM_VERSION.log" -host "$ADDRESS" -port "$PORT" $CONFIG $DEBUG $HUB
+
 java $JAVA_ARGS-jar "$JAR" -role "$ROLE" -log "$DIR/logs/$NAME-server-$SELENIUM_VERSION.log" -host "$ADDRESS" -port "$PORT" $CONFIG $DEBUG $HUB
