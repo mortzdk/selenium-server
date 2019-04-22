@@ -41,6 +41,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 DEBUG="false"
 ADDRESS="0.0.0.0"
 JAVA_ARGS=""
+ROLE="standalone"
 
 # Get platform script is running on
 unameOut="$(uname -s)"
@@ -60,7 +61,7 @@ esac
 
 # Show how to use server script
 function show_info() {
-    echo -e "./server.sh\n\t-i Shows the information about the arguments available for the server\n\t-s Start a standalone selenium server\n\t-h [HUB_HOST] Start a selenium server hub or passes the address to the hub\n\t-n Start a selenium server node\n\t-j {JAR_PATH} The path to a selenium server jar. If none is present, the newest in the jars folder will be used.\n\t-a {ADDRESS} The address for which the server should run. Default to 0.0.0.0.\n\t-p {PORT} The port that the server should run on. Default 4444 for hub and 5555 for node\n\t-d Enable debug mode\n\t-c {CONFIG_PATH} The path to a selenium config json file. If none is present, a config file will be generated based on the environment.";
+    echo -e "./server.sh\n\t-i Shows the information about the arguments available for the server\n\t-r Which role the server should have. Valid arguments are 'standalone', 'node', 'hub'.\n\t-h [HUB_HOST] The address to the hub host\n\t-j {JAR_PATH} The path to a selenium server jar. If none is present, the newest in the jars folder will be used.\n\t-a {ADDRESS} The address for which the server should run. Default to 0.0.0.0.\n\t-p {PORT} The port that the server should run on. Default 4444 for standalone and hub, and 5555 for node\n\t-d Enable debug mode\n\t-c {CONFIG_PATH} The path to a selenium config json file. If none is present, a config file will be generated based on the environment.";
     exit 1
 }
 
@@ -70,28 +71,49 @@ if [ $# -eq 0 ]; then
 fi
 
 # Parse options to script
-while getopts a:j:p:c:shnid option
+while getopts r:a:j:p:c:h:id option
 do
 case "${option}"
 in
-a) ADDRESS=${OPTARG};;
-i) show_info;;
-j) JAR=${OPTARG};;
-p) PORT=${OPTARG};;
-c) CONFIG=${OPTARG};;
-h) ROLE="hub"; HUB=${OPTARG};;
-n) ROLE="node";;
-s) ROLE="standalone";;
-d) DEBUG="true";;
+a) 
+    ADDRESS=${OPTARG}
+    ;;
+i) 
+    show_info
+    ;;
+j) 
+    JAR=${OPTARG}
+    ;;
+p) 
+    PORT=${OPTARG}
+    ;;
+c) 
+    CONFIG=${OPTARG}
+    ;;
+h) 
+    HUB=${OPTARG}
+    ;;
+r) 
+    ROLE=${OPTARG}
+    ;;
+d) 
+    DEBUG="true"
+    ;;
 esac
 done
 
-# If neither node or hub parameter were given throw error and show info 
-if [[ -z "$ROLE" ]]; then
-    echo "ERROR: Either -s, -n or -h must be used to specify whether server should run in standalone, node or hub mode" >&2
-    echo ""
-    show_info
-fi
+# Check role is valid
+case $ROLE in
+    standalone)
+        ;;
+    node)
+        ;;
+    hub)
+        ;;
+    *)
+        show_info
+        ;;
+esac
 
 # Generate application name if none was given
 NAME="selenium-$ROLE"
