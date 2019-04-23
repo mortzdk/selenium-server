@@ -14,19 +14,21 @@
 # * sed
 # * jq
 #
-# If no configuration file is specifically given, the script will generate an
+# For CygWin it is moreover required that powershell is installed.
+#
+# If no configuration file is specified, the script will generate an
 # appropriate configuration file for the server. Moreover the script will 
 # download and use the latest version of the chrome, opera, gecko, ie, safari,
-# and edge drivers, along with the newest version of the selenium server. Each
-# driver will be available from the 'drivers' folder, and will only be 
-# downloaded once.
+# and edge drivers based on which browsers are installed on the system, along
+# with the newest version of the selenium server. Each driver will be available
+# from the 'drivers' folder, and will only be downloaded once.
 #
 # All logs will be stored in the 'logs' folder.
 #
 # Known issues:
 # * On Windows (CygWin) the path to the firefox binary must be set using the
-#   system environment PATH, which in turn means that only one instance of
-#   firefox can be run for each selenium-server.
+#   system environment PATH, which in turn means that only one instance 
+#   (version) of firefox can be run for each selenium-server.
 # * The IE driver follows the selenium versioning meaning that the driver will
 #   probably only work for the specific version of the selenium JAR.
 # * Multiple versions of browsers can be installed on the OS. There should be
@@ -115,7 +117,7 @@ case $ROLE in
         ;;
 esac
 
-# Generate application name if none was given
+# Generate application name
 NAME="selenium-$ROLE"
 
 # Function that checks whether command is available and installed
@@ -246,7 +248,7 @@ function check_chrome {
         CHROME_STRING=$($CHROME_PATH --version)
     elif [[ -x "$(command -v 'google-chrome-stable')" ]]
     then
-        CHROME_PATH=$(which google-chrome)
+        CHROME_PATH=$(which google-chrome-stable)
         CHROME_STRING=$($CHROME_PATH --version)
     elif [[ -x "$(command -v 'chromium-browser')" ]]
     then
@@ -369,7 +371,7 @@ END
 
     if [[ $PLATFORM != "win" ]]
     then
-        eval"$2+=\"-Dwebdriver.firefox.bin='$FIREFOX_PATH' \""
+        eval "$2+=\"-Dwebdriver.firefox.bin='$FIREFOX_PATH' \""
     fi
 }
 
@@ -379,24 +381,46 @@ function check_opera {
     local OPERA_STRING=""
     if [[ $PLATFORM = "win" ]]
     then
-        return
+        if [[ -d "/cygdrive/c/Program\ Files/Opera" ]]; then
+            OPERA_PATH="/cygdrive/c/Program\ Files/Opera"
+        elif [[ -d "$USERPROFILE/AppData/Local/Programs/Opera" ]]; then
+            OPERA_PATH="$USERPROFILE/AppData/Local/Programs/Opera"
+        else
+            return
+        fi
+
+        if [[ -f "$OPERA_PATH/opera.exe" ]]; then
+            OPERA_PATH+="/opera.exe"
+            OPERA_VERSION=$($OPERA_PATH --version)
+        else
+            while IFS='' read -r line || [ -n "$line" ]; do
+                [ -z "$line" ] && continue
+                semver_version $line "OPERA_VERSION"
+                if ! [[ -z $OPERA_VERSION ]]; then
+                    OPERA_PATH+="/$OPERA_VERSION/opera.exe" 
+                    break 
+                fi
+            done < <(find . -maxdepth 1 -type d -printf '%f\n')
+
+            if ! [[ -z $OPERA_VERSION ]]; then
+                return
+            fi
+        fi
     elif [[ -x "$(command -v 'opera')" ]]
     then
         OPERA_PATH=$(which opera)
-        OPERA_STRING=""$($OPERA_PATH --version)
+        OPERA_STRING="$($OPERA_PATH --version)"
     else
         return
     fi
 
-    local OPERA_VERSION_STRING=$(echo "$OPERA_STRING" | grep -oP "\d+\.\d+\.\d+\.\d+")
-
-    compare_versions "$OPERA_VERSION_STRING" "12.15"
+    compare_versions "$OPERA_VERSION" "12.15"
     if [[ "$?" = "1" ]];
     then
         semver_version `wget -qO- "https://api.github.com/repos/operasoftware/operachromiumdriver/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'` "OD_VERSION"
 
         echo "Using OperaChromiumDriver version: "$OD_VERSION
-        echo "For Opera version: $OPERA_VERSION_STRING"
+        echo "For Opera version: $OPERA_VERSION"
 
         if [ ! -f "$DIR/drivers/operachromiumdriver-$OD_VERSION$EXT" ]; then
             wget --no-verbose -O "/tmp/operachromiumdriver_${PLATFORM}${ARCH}.zip" "https://github.com/operasoftware/operachromiumdriver/releases/download/v.$OD_VERSION/operadriver_${PLATFORM}${ARCH}.zip"
