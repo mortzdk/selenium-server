@@ -67,11 +67,6 @@ function show_info() {
     exit 1
 }
 
-# If no parameters are given show info
-if [ $# -eq 0 ]; then
-    show_info
-fi
-
 # Parse options to script
 while getopts r:a:j:p:c:h:id option
 do
@@ -378,13 +373,13 @@ END
 # Check if opera is installed, download corresponding driver and generate
 # capabilities.
 function check_opera {
-    local OPERA_STRING=""
     if [[ $PLATFORM = "win" ]]
     then
+        local OPATH=$(echo $USERPROFILE | sed -e 's/\\/\//g' | sed -e 's/C:/\/cygdrive\/c/g' | sed -e 's/ /\\ /g' | sed -e 's/(/\\(/g' | sed -e 's/)/\\)/g')
         if [[ -d "/cygdrive/c/Program\ Files/Opera" ]]; then
             OPERA_PATH="/cygdrive/c/Program\ Files/Opera"
-        elif [[ -d "$USERPROFILE/AppData/Local/Programs/Opera" ]]; then
-            OPERA_PATH="$USERPROFILE/AppData/Local/Programs/Opera"
+        elif [[ -d "$OPATH/AppData/Local/Programs/Opera" ]]; then
+            OPERA_PATH="$OPATH/AppData/Local/Programs/Opera"
         else
             return
         fi
@@ -400,21 +395,21 @@ function check_opera {
                     OPERA_PATH+="/$OPERA_VERSION/opera.exe" 
                     break 
                 fi
-            done < <(find . -maxdepth 1 -type d -printf '%f\n')
+            done < <(find $OPERA_PATH -maxdepth 1 -type d -printf '%f\n')
 
-            if ! [[ -z $OPERA_VERSION ]]; then
+            if [[ -z $OPERA_VERSION ]]; then
                 return
             fi
         fi
     elif [[ -x "$(command -v 'opera')" ]]
     then
         OPERA_PATH=$(which opera)
-        OPERA_STRING="$($OPERA_PATH --version)"
+        OPERA_VERSION="$($OPERA_PATH --version)"
     else
         return
     fi
 
-    compare_versions "$OPERA_VERSION" "12.15"
+    compare_versions "$OPERA_VERSION" "25"
     if [[ "$?" = "1" ]];
     then
         semver_version `wget -qO- "https://api.github.com/repos/operasoftware/operachromiumdriver/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'` "OD_VERSION"
