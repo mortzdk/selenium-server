@@ -745,10 +745,9 @@ else
     DEBUG=""
 fi
 
-echo "========================== Server type: $ROLE =========================="
-semver_version "$JAR" "SELENIUM_VERSION"
-
 echo "========================== Running Command: =========================="
 echo java $JAVA_ARGS-jar "$JAR" -role "$ROLE" -log "$DIR/logs/$NAME-server-$SELENIUM_VERSION.log" -host "$ADDRESS" -port "$PORT" $CONFIG $DEBUG $HUB
 
+echo "========================== Server type: $ROLE =========================="
+semver_version "$JAR" "SELENIUM_VERSION"
 java $JAVA_ARGS-jar "$JAR" -role "$ROLE" -log "$DIR/logs/$NAME-server-$SELENIUM_VERSION.log" -host "$ADDRESS" -port "$PORT" $CONFIG $DEBUG $HUB
