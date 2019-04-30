@@ -560,29 +560,105 @@ END
     eval "$2+=\"-Dwebdriver.ie.driver=$DIR/drivers/iedriver.exe -Dwebdriver.ie.driver.logfile=$DIR/logs/iedriver.log -Dwebdriver.ie.driver.loglevel=TRACE \""
 }
 
-#function check_edge {
-#    if [[ $PLATFORM = "win" ]]
-#    then
-#        return
-#    else
-#        return
-#    fi
-#
-#    local cap=$(cat <<-END
-#    {
-#        \"version\": \"$EDGE_VERSION_STRING\",
-#        \"browserName\": \"edge\",
-#        \"platformName\": \"$PLATFORM_NAME\",
-#        \"maxInstances\": 5,
-#        \"seleniumProtocol\": \"WebDriver\",
-#        \"applicationName\": \"$NAME-edge\"
-#    },
-#END
-#)
-#
-#    eval "$1+=\"$cap\""
-#    eval "$2+=\"-Dwebdriver.edge.driver=$DIR/drivers/edgedriver.exe \""
-#}
+function check_edge {
+    if [[ $PLATFORM = "win" ]]
+    then
+        EDGE_STRING=`echo "\n" | powershell.exe -command "Get-AppxPackage -Name Microsoft.MicrosoftEdge | Foreach Version"`
+        if [[ -z "${EDGE_STRING// }" ]]; then
+            EDGE_STRING=`echo "\n" | powershell.exe -command "Get-AppxPackage -Name *Edge* | Foreach Version"`
+            if [[ -z "${IE_STRING// }" ]]; then
+                EDGE_STRING=`echo "\n" | powershell.exe -command "Get-AppxPackage -Name *Spartan* | Foreach Version"`
+                if [[ -z "${IE_STRING// }" ]]; then
+                    return
+                fi
+            fi
+        fi
+    else
+        return
+    fi
+
+    semver_version "$EDGE_STRING" "EDGE_VERSION"
+
+    # Determine EdgeHTML version based on edge version
+    # https://en.wikipedia.org/wiki/Microsoft_Edge#EdgeHTML_(2014%E2%80%932019)_2
+    compare_versions "$EDGE_VERSION" "44"
+    if [[ "$?" = "1" ]] || [[ "$?" = "0" ]];
+    then
+        # 18
+        EDGE_HTML_VERSION='18.17763'
+    else
+        compare_versions "$EDGE_VERSION" "42"
+        if [[ "$?" = "1" ]] || [[ "$?" = "0" ]]; then
+            # 17
+            EDGE_HTML_VERSION='17.17134'
+        else
+            compare_versions "$EDGE_VERSION" "41"
+            if [[ "$?" = "1" ]] || [[ "$?" = "0" ]];
+            then
+                # 16
+                EDGE_HTML_VERSION='16.16299'
+            else
+                compare_versions "$EDGE_VERSION" "39.14942"
+                if [[ "$?" = "1" ]] || [[ "$?" = "0" ]];
+                then
+                    # 15
+                    EDGE_HTML_VERSION='15.15063'
+                else
+                    compare_versions "$EDGE_VERSION" "31"
+                    if [[ "$?" = "1" ]] || [[ "$?" = "0" ]];
+                    then
+                        # 14
+                        EDGE_HTML_VERSION='14.14393'
+                    else
+                        compare_versions "$EDGE_VERSION" "21"
+                        if [[ "$?" = "1" ]] || [[ "$?" = "0" ]];
+                        then
+                            # 13
+                            EDGE_HTML_VERSION='13.10586'
+                        else
+                            # 12
+                            EDGE_HTML_VERSION='12.10240'
+                        fi
+                    fi
+                fi
+            fi
+        fi
+    fi
+
+    if ! [[ -f "$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe" ]]; then
+        # Get minor version of driver 
+        semver_version "$EDGE_HTML_VERSION" "EDGE_HTML_VERSION"
+        if [[ -z "$MINOR" ]]; then
+            return
+        fi
+
+        local DRIVERS=$(wget -qO- https://developer.microsoft.com/en-us/microsoft-edge/tools/webdriver/)
+        local LINK=$(echo $DRIVERS | sed -n "s/.*href=\"\([^\"]*\)[^>]*>Release $MINOR<\/a>.*/\1/p")
+        if [[ -z "$LINK" ]]; then
+            return
+        fi
+
+        # Download driver
+        wget -q --no-verbose -O "$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe" $LINK
+        chmod 755 "$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe"
+        ln -fs "$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe" "$DIR/drivers/edgedriver.exe"
+    fi
+
+    local cap=$(cat <<-END
+    {
+        \"version\": \"$EDGE_VERSION\",
+        \"browserName\": \"edge\",
+        \"platformName\": \"$PLATFORM_NAME\",
+        \"maxInstances\": 1,
+        \"seleniumProtocol\": \"WebDriver\",
+        \"applicationName\": \"$NAME-edge\"
+    },
+END
+)
+
+    eval "$1+=\"$cap\""
+    eval "$2+=\"-Dwebdriver.edge.driver=$DIR/drivers/edgedriver.exe \""
+}
 
 echo "========================== Checking Required Programs =========================="
 
@@ -638,7 +714,7 @@ END
         check_opera "CONF" "JAVA_ARGS"
         #check_safari "CONF" "JAVA_ARGS"
         check_ie "CONF" "JAVA_ARGS"
-        #check_edge "CONF" "JAVA_ARGS"
+        check_edge "CONF" "JAVA_ARGS"
 
         CONF=${CONF%?};
         CONF+="]}"
@@ -712,7 +788,7 @@ END
         check_opera "CONF" "JAVA_ARGS"
         #check_safari "CONF" "JAVA_ARGS"
         check_ie "CONF" "JAVA_ARGS"
-        #check_edge "CONF" "JAVA_ARGS"
+        check_edge "CONF" "JAVA_ARGS"
 
         CONF=${CONF%?};
         CONF+="]}"
