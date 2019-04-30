@@ -625,6 +625,13 @@ function check_edge {
         fi
     fi
 
+    if [[ -z "$EDGE_HTML_VERSION" ]]; then
+        return
+    fi
+
+    echo "Using edgedriver version $EDGE_HTML_VERSION"
+    echo "For Microsoft Edge version: $EDGE_VERSION"
+
     if ! [[ -f "$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe" ]]; then
         # Get minor version of driver 
         semver_version "$EDGE_HTML_VERSION" "EDGE_HTML_VERSION"
@@ -639,7 +646,7 @@ function check_edge {
         fi
 
         # Download driver
-        wget -q --no-verbose -O "$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe" $LINK
+        wget --no-verbose -O "$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe" $LINK
         chmod 755 "$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe"
         ln -fs "$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe" "$DIR/drivers/edgedriver.exe"
     fi
