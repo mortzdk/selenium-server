@@ -44,31 +44,53 @@ DEBUG="false"
 ADDRESS="0.0.0.0"
 JAVA_ARGS=""
 ROLE="standalone"
+MAXINSTANCES=5
 
 # Get platform script is running on
 unameOut="$(uname -s)"
 case "${unameOut}" in
-    Linux*)     PLATFORM="linux"; PLATFORM_NAME="linux"; EXT="";;
-    Darwin*)    PLATFORM="mac"; PLATFORM_NAME="mac"; EXT="";;
-    CYGWIN*)    PLATFORM="win"; PLATFORM_NAME="windows"; EXT=".exe"; DIR=".";;
-    *)          echo "ERROR: Unsupported platform '$unameOut'." >&2; exit 1
+    Linux*)
+        PLATFORM="linux";
+        PLATFORM_NAME="linux";
+        EXT=""
+        ;;
+    Darwin*)
+        PLATFORM="mac";
+        PLATFORM_NAME="mac";
+        EXT=""
+        ;;
+    CYGWIN*)
+        PLATFORM="win";
+        PLATFORM_NAME="windows";
+        EXT=".exe";
+        DIR="."
+        ;;
+    *)          
+        echo "ERROR: Unsupported platform '$unameOut'." >&2;
+        exit 1
 esac
 
 archOut="$(arch)"
 case "${archOut}" in
-    i686*)      ARCH="32";;
-    x86_64*)    ARCH="64";;
-    *)          echo "ERROR: Unsupported architecture '$archOut'." >&2; exit 1
+    i686*)
+        ARCH="32"
+        ;;
+    x86_64*)
+        ARCH="64"
+        ;;
+    *)
+        echo "ERROR: Unsupported architecture '$archOut'." >&2;
+        exit 1
 esac
 
 # Show how to use server script
 function show_info() {
-    echo -e "./server.sh\n\t-i Shows the information about the arguments available for the server\n\t-r Which role the server should have. Valid arguments are 'standalone', 'node', 'hub'.\n\t-h [HUB_HOST] The address to the hub host\n\t-j {JAR_PATH} The path to a selenium server jar. If none is present, the newest in the jars folder will be used.\n\t-a {ADDRESS} The address for which the server should run. Default to 0.0.0.0.\n\t-p {PORT} The port that the server should run on. Default 4444 for standalone and hub, and 5555 for node\n\t-d Enable debug mode\n\t-c {CONFIG_PATH} The path to a selenium config json file. If none is present, a config file will be generated based on the environment.";
+    echo -e "./server.sh\n\t-i Shows the information about the arguments available for the server\n\t-r Which role the server should have. Valid arguments are 'standalone', 'node', 'hub'.\n\t-h [HUB_HOST] The address to the hub host\n\t-j {JAR_PATH} The path to a selenium server jar. If none is present, the newest in the jars folder will be used.\n\t-a {ADDRESS} The address for which the server should run. Default to 0.0.0.0.\n\t-p {PORT} The port that the server should run on. Default 4444 for standalone and hub, and 5555 for node\n\t-d Enable debug mode\n\t-m {MAXINSTANCES} The number of instances of each of the drivers\n\t-c {CONFIG_PATH} The path to a selenium config json file. If none is present, a config file will be generated based on the environment.";
     exit 1
 }
 
 # Parse options to script
-while getopts r:a:j:p:c:h:id option
+while getopts r:a:j:p:c:h:m:id option
 do
 case "${option}"
 in
@@ -95,6 +117,11 @@ r)
     ;;
 d) 
     DEBUG="true"
+    ;;
+m)
+    if [[ ${OPTARG} =~ ^[0-9]+$ ]] ; then
+        MAXINSTANCES=${OPTARG}
+    fi
     ;;
 esac
 done
@@ -258,21 +285,14 @@ function check_chrome {
     wget -q --no-verbose -O /tmp/LATEST_RELEASE "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAYOR_VERSION}"
     CD_VERSION=$(cat "/tmp/LATEST_RELEASE") 
     rm /tmp/LATEST_RELEASE 
-    if [ -z "$CHROME_DRIVER_VERSION" ]; 
-    then
-        CHROME_DRIVER_VERSION="${CD_VERSION}"; 
-    fi 
-    CD_VERSION=$(echo $CHROME_DRIVER_VERSION)
     echo "Using chromedriver version: $CD_VERSION"
     echo "For chrome version: $CHROME_VERSION"
     if [ ! -f "$DIR/drivers/chromedriver-$CD_VERSION" ]; then
         wget --no-verbose -O "/tmp/chromedriver_${PLATFORM}${ARCH}.zip" "https://chromedriver.storage.googleapis.com/$CD_VERSION/chromedriver_${PLATFORM}${ARCH}.zip"
-        rm -f "$DIR/drivers/chromedriver$EXT"
         unzip "/tmp/chromedriver_${PLATFORM}${ARCH}.zip" -d "$DIR/drivers"
         rm "/tmp/chromedriver_${PLATFORM}${ARCH}.zip"
         mv "$DIR/drivers/chromedriver$EXT" "$DIR/drivers/chromedriver-$CD_VERSION$EXT"
         chmod 755 "$DIR/drivers/chromedriver-$CD_VERSION$EXT"
-        ln -fs "$DIR/drivers/chromedriver-$CD_VERSION$EXT" "$DIR/drivers/chromedriver$EXT"
     fi
 
     local ESCAPED_CHROME_PATH=$(jq -aR . <<< "$CHROME_PATH")
@@ -281,7 +301,7 @@ function check_chrome {
         \"version\": \"$CHROME_VERSION\",
         \"browserName\": \"chrome\",
         \"platformName\": \"$PLATFORM_NAME\",
-        \"maxInstances\": 5,
+        \"maxInstances\": $MAXINSTANCES,
         \"seleniumProtocol\": \"WebDriver\",
         \"applicationName\": \"$NAME-chrome\",
         \"chromeOptions\": {
@@ -291,7 +311,7 @@ function check_chrome {
 END
 )
     eval "$1+=\"$cap\""
-    eval "$2+=\"-Dwebdriver.chrome.driver=$DIR/drivers/chromedriver$EXT -Dwebdriver.chrome.logfile=$DIR/logs/chromedriver.log -Dwebdriver.chrome.verboseLogging=true \""
+    eval "$2+=\"-Dwebdriver.chrome.driver=$DIR/drivers/chromedriver-$CD_VERSION$EXT -Dwebdriver.chrome.logfile=$DIR/logs/chromedriver.log -Dwebdriver.chrome.verboseLogging=true \""
 }
 
 # Check if firefox is installed, download corresponding driver and generate
@@ -330,7 +350,6 @@ function check_firefox {
 
     if [ ! -f "$DIR/drivers/geckodriver-$GK_VERSION$EXT" ]; then
         wget --no-verbose -O "/tmp/geckodriver.$COMP_EXT" "https://github.com/mozilla/geckodriver/releases/download/v$GK_VERSION/geckodriver-v$GK_VERSION-${PLATFORM}${ARCH}.$COMP_EXT"
-        rm -f "$DIR/drivers/geckodriver$EXT"
         if [[ "$COMP_EXT" = "zip" ]]; then
             unzip "/tmp/geckodriver.$COMP_EXT" -d "$DIR/drivers"
             rm "/tmp/geckodriver.$COMP_EXT"
@@ -340,7 +359,6 @@ function check_firefox {
         fi
         mv "$DIR/drivers/geckodriver$EXT" "$DIR/drivers/geckodriver-$GK_VERSION$EXT"
         chmod 755 "$DIR/drivers/geckodriver-$GK_VERSION$EXT"
-        ln -fs "$DIR/drivers/geckodriver-$GK_VERSION$EXT" "$DIR/drivers/geckodriver$EXT"
     fi
 
     local cap=$(cat <<-END
@@ -349,7 +367,7 @@ function check_firefox {
         \"version\": \"$FIREFOX_VERSION\",
         \"browserName\": \"firefox\",
         \"platformName\": \"$PLATFORM_NAME\",
-        \"maxInstances\": 5,
+        \"maxInstances\": $MAXINSTANCES,
         \"seleniumProtocol\": \"WebDriver\",
         \"moz:firefoxOptions\" : {
             \"log\": {
@@ -362,7 +380,7 @@ END
 )
 
     eval "$1+=\"$cap\""
-    eval "$2+=\"-Dwebdriver.gecko.driver=$DIR/drivers/geckodriver$EXT -Dwebdriver.firefox.logfile=$DIR/logs/geckodriver.log \""
+    eval "$2+=\"-Dwebdriver.gecko.driver=$DIR/drivers/geckodriver-$GK_VERSION$EXT -Dwebdriver.firefox.logfile=$DIR/logs/geckodriver.log \""
 
     if [[ $PLATFORM != "win" ]]
     then
@@ -419,13 +437,11 @@ function check_opera {
 
         if [ ! -f "$DIR/drivers/operachromiumdriver-$OD_VERSION$EXT" ]; then
             wget --no-verbose -O "/tmp/operachromiumdriver_${PLATFORM}${ARCH}.zip" "https://github.com/operasoftware/operachromiumdriver/releases/download/v.$OD_VERSION/operadriver_${PLATFORM}${ARCH}.zip"
-            rm -f "$DIR/drivers/operachromiumdriver$EXT"
             unzip "/tmp/operachromiumdriver_${PLATFORM}${ARCH}.zip" -d "/tmp/operachromiumdriver"
             rm "/tmp/operachromiumdriver_${PLATFORM}${ARCH}.zip"
             mv "/tmp/operachromiumdriver/operadriver_${PLATFORM}${ARCH}/operadriver$EXT" "$DIR/drivers/operachromiumdriver-$OD_VERSION$EXT"
             chmod 755 "$DIR/drivers/operachromiumdriver-$OD_VERSION$EXT"
-            ln -fs "$DIR/drivers/operachromiumdriver-$OD_VERSION$EXT" "$DIR/drivers/operachromiumdriver$EXT"
-            rm -r "/tmp/operachromiumdriver"
+            rm -rf "/tmp/operachromiumdriver"
         fi
     else
         return
@@ -437,7 +453,7 @@ function check_opera {
         \"version\": \"$OPERA_VERSION_STRING\",
         \"browserName\": \"opera\",
         \"platformName\": \"$PLATFORM_NAME\",
-        \"maxInstances\": 5,
+        \"maxInstances\": $MAXINSTANCES,
         \"seleniumProtocol\": \"WebDriver\",
         \"applicationName\": \"$NAME-opera\",
         \"operaOptions\": {
@@ -448,7 +464,7 @@ END
 )
 
     eval "$1+=\"$cap\""
-    eval "$2+=\"-Dwebdriver.opera.driver=$DIR/drivers/operachromiumdriver$EXT -Dwebdriver.opera.logfile=$DIR/logs/operachromiumdriver.log -Dwebdriver.opera.verboseLogging=true \""
+    eval "$2+=\"-Dwebdriver.opera.driver=$DIR/drivers/operachromiumdriver-$OD_VERSION$EXT -Dwebdriver.opera.logfile=$DIR/logs/operachromiumdriver.log -Dwebdriver.opera.verboseLogging=true \""
 }
 
 #function check_safari {
@@ -480,7 +496,7 @@ END
 #        \"version\": \"$OPERA_VERSION_STRING\",
 #        \"browserName\": \"safari\",
 #        \"platformName\": \"$PLATFORM_NAME\",
-#        \"maxInstances\": 5,
+#        \"maxInstances\": $MAXINSTANCES,
 #        \"seleniumProtocol\": \"WebDriver\",
 #        \"applicationName\": \"$NAME-safari\"
 #    },
@@ -536,12 +552,10 @@ function check_ie {
 
     if ! [[ -f "$DIR/drivers/iedriver-$ID_VERSION.exe" ]]; then
         wget --no-verbose -O "/tmp/IEDriverServer_${IE_ARCH}_$ID_VERSION.zip" "https://selenium-release.storage.googleapis.com/$MAJOR.$MINOR/IEDriverServer_${IE_ARCH}_$ID_VERSION.zip"
-        rm -f "$DIR/drivers/iedriver.exe"
         unzip "/tmp/IEDriverServer_${IE_ARCH}_$ID_VERSION.zip" -d "$DIR/drivers"
         rm "/tmp/IEDriverServer_${IE_ARCH}_$ID_VERSION.zip"
         mv "$DIR/drivers/IEDriverServer.exe" "$DIR/drivers/iedriver-$ID_VERSION.exe"
         chmod 755 "$DIR/drivers/iedriver-$ID_VERSION.exe"
-        ln -fs "$DIR/drivers/iedriver-$ID_VERSION.exe" "$DIR/drivers/iedriver.exe"
     fi
 
     local cap=$(cat <<-END
@@ -549,7 +563,7 @@ function check_ie {
         \"version\": \"$IE_VERSION_STRING\",
         \"browserName\": \"internet explorer\",
         \"platformName\": \"$PLATFORM_NAME\",
-        \"maxInstances\": 5,
+        \"maxInstances\": $MAXINSTANCES,
         \"seleniumProtocol\": \"WebDriver\",
         \"applicationName\": \"$NAME-ie\"
     },
@@ -557,7 +571,7 @@ END
 )
 
     eval "$1+=\"$cap\""
-    eval "$2+=\"-Dwebdriver.ie.driver=$DIR/drivers/iedriver.exe -Dwebdriver.ie.driver.logfile=$DIR/logs/iedriver.log -Dwebdriver.ie.driver.loglevel=TRACE \""
+    eval "$2+=\"-Dwebdriver.ie.driver=$DIR/drivers/iedriver-$ID_VERSION.exe -Dwebdriver.ie.driver.logfile=$DIR/logs/iedriver.log -Dwebdriver.ie.driver.loglevel=TRACE \""
 }
 
 function check_edge {
@@ -632,23 +646,27 @@ function check_edge {
     echo "Using edgedriver version $EDGE_HTML_VERSION"
     echo "For Microsoft Edge version: $EDGE_VERSION"
 
-    if ! [[ -f "$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe" ]]; then
-        # Get minor version of driver 
-        semver_version "$EDGE_HTML_VERSION" "EDGE_HTML_VERSION"
-        if [[ -z "$MINOR" ]]; then
-            return
+    compare_versions "$EDGE_HTML_VERSION" "18"
+    if ! [[ "$?" = 1 ]]; then
+        if ! [[ -f "$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe" ]]; then
+            # Get minor version of driver 
+            semver_version "$EDGE_HTML_VERSION" "EDGE_HTML_VERSION"
+            if [[ -z "$MINOR" ]]; then
+                return
+            fi
+
+            local DRIVERS=$(wget -qO- https://developer.microsoft.com/en-us/microsoft-edge/tools/webdriver/)
+            local LINK=$(echo $DRIVERS | sed -n "s/.*href=\"\([^\"]*\)[^>]*>Release $MINOR<\/a>.*/\1/p")
+            if [[ -z "$LINK" ]]; then
+                return
+            fi
+
+            # Download driver
+            wget --no-verbose -O "$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe" $LINK
+            chmod 755 "$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe"
         fi
 
-        local DRIVERS=$(wget -qO- https://developer.microsoft.com/en-us/microsoft-edge/tools/webdriver/)
-        local LINK=$(echo $DRIVERS | sed -n "s/.*href=\"\([^\"]*\)[^>]*>Release $MINOR<\/a>.*/\1/p")
-        if [[ -z "$LINK" ]]; then
-            return
-        fi
-
-        # Download driver
-        wget --no-verbose -O "$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe" $LINK
-        chmod 755 "$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe"
-        ln -fs "$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe" "$DIR/drivers/edgedriver.exe"
+        eval "$2+=\"-Dwebdriver.edge.driver=$DIR/drivers/edgedriver-$EDGE_HTML_VERSION.exe \""
     fi
 
     local cap=$(cat <<-END
@@ -656,7 +674,7 @@ function check_edge {
         \"version\": \"$EDGE_VERSION\",
         \"browserName\": \"edge\",
         \"platformName\": \"$PLATFORM_NAME\",
-        \"maxInstances\": 1,
+        \"maxInstances\": $MAXINSTANCES,
         \"seleniumProtocol\": \"WebDriver\",
         \"applicationName\": \"$NAME-edge\"
     },
@@ -664,7 +682,6 @@ END
 )
 
     eval "$1+=\"$cap\""
-    eval "$2+=\"-Dwebdriver.edge.driver=$DIR/drivers/edgedriver.exe \""
 }
 
 echo "========================== Checking Required Programs =========================="
