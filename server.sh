@@ -2,6 +2,8 @@
 #
 # server.sh
 #
+# Version: 0.1
+#
 # Script for starting selenium server node, hub, or standalone on Linux, MacOS, 
 # and Window (Cygwin).
 #
@@ -16,24 +18,6 @@
 #
 # For CygWin it is moreover required that powershell is installed.
 #
-# If no configuration file is specified, the script will generate an
-# appropriate configuration file for the server. Moreover the script will 
-# download and use the latest version of the chrome, opera, gecko, ie, safari,
-# and edge drivers based on which browsers are installed on the system, along
-# with the newest version of the selenium server. Each driver will be available
-# from the 'drivers' folder, and will only be downloaded once.
-#
-# All logs will be stored in the 'logs' folder.
-#
-# Known issues:
-# * On Windows (CygWin) the path to the firefox binary must be set using the
-#   system environment PATH, which in turn means that only one instance 
-#   (version) of firefox can be run for each selenium-server.
-# * The IE driver follows the selenium versioning meaning that the driver will
-#   probably only work for the specific version of the selenium JAR.
-# * Multiple versions of browsers can be installed on the OS. There should be
-#   a way to setup multiple of the same browser instance.
-#
 # Copyright (C) 2019 Morten Houmøller Nygaard <mortzdk@gmail.com>
 #
 # Distributed under terms of the MIT license.
@@ -45,6 +29,7 @@ ADDRESS="0.0.0.0"
 JAVA_ARGS=""
 ROLE="standalone"
 MAXINSTANCES=5
+NAME=""
 
 # Get platform script is running on
 unameOut="$(uname -s)"
@@ -85,12 +70,12 @@ esac
 
 # Show how to use server script
 function show_info() {
-    echo -e "./server.sh\n\t-i Shows the information about the arguments available for the server\n\t-r Which role the server should have. Valid arguments are 'standalone', 'node', 'hub'.\n\t-h [HUB_HOST] The address to the hub host\n\t-j {JAR_PATH} The path to a selenium server jar. If none is present, the newest in the jars folder will be used.\n\t-a {ADDRESS} The address for which the server should run. Default to 0.0.0.0.\n\t-p {PORT} The port that the server should run on. Default 4444 for standalone and hub, and 5555 for node\n\t-d Enable debug mode\n\t-m {MAXINSTANCES} The number of instances of each of the drivers\n\t-c {CONFIG_PATH} The path to a selenium config json file. If none is present, a config file will be generated based on the environment.";
+    echo -e "./server.sh\n\t-i Shows the information about the arguments available for the server\n\t-d Enable debug mode\n\t-n {NAME} A name for the application server\n\t-r {ROLE} Which role the server should have. Valid arguments are 'standalone', 'node', 'hub'.\n\t-h {HUB_HOST} The address to the hub host\n\t-j {JAR_PATH} The path to a selenium server jar. If none is present, the newest in the jars folder will be used.\n\t-a {ADDRESS} The address for which the server should run. Default to 0.0.0.0.\n\t-p {PORT} The port that the server should run on. Default 4444 for standalone and hub, and 5555 for node\n\t-m {MAXINSTANCES} The number of instances of each of the drivers\n\t-D {JAVA_ARGS} Arguments to supply to the jar\n\t-c {CONFIG_PATH} The path to a selenium config json file. If none is present, a config file will be generated based on the environment.";
     exit 1
 }
 
 # Parse options to script
-while getopts r:a:j:p:c:h:m:id option
+while getopts r:a:j:p:c:h:m:D:id option
 do
 case "${option}"
 in
@@ -118,10 +103,16 @@ r)
 d) 
     DEBUG="true"
     ;;
+D) 
+    JAVA_ARGS=${OPTARG}
+    ;;
 m)
     if [[ ${OPTARG} =~ ^[0-9]+$ ]] ; then
         MAXINSTANCES=${OPTARG}
     fi
+    ;;
+n)
+    NAME=${OPTARG}
     ;;
 esac
 done
@@ -140,7 +131,12 @@ case $ROLE in
 esac
 
 # Generate application name
-NAME="selenium-$ROLE"
+if [[ -z $NAME ]];
+then
+    NAME="selenium-$ROLE"
+else
+    NAME="selenium-$ROLE-$NAME"
+fi
 
 # Function that checks whether command is available and installed
 function is_installed()
