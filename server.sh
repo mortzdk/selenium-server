@@ -446,7 +446,7 @@ function check_opera {
     local ESCAPED_OPERA_PATH=$(jq -aR . <<< "$OPERA_PATH")
     local cap=$(cat <<-END
     {
-        \"version\": \"$OPERA_VERSION_STRING\",
+        \"version\": \"$OPERA_VERSION\",
         \"browserName\": \"opera\",
         \"platformName\": \"$PLATFORM_NAME\",
         \"maxInstances\": $MAXINSTANCES,
@@ -667,6 +667,7 @@ function check_edge {
 
     local cap=$(cat <<-END
     {
+        \"edgeHtmlVersion\": \"$EDGE_HTML_VERSION\",
         \"version\": \"$EDGE_VERSION\",
         \"browserName\": \"edge\",
         \"platformName\": \"$PLATFORM_NAME\",
