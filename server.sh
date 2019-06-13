@@ -37,18 +37,21 @@ case "${unameOut}" in
     Linux*)
         PLATFORM="linux";
         PLATFORM_NAME="linux";
-        EXT=""
+        EXT="";
+        SEP=":";
         ;;
     Darwin*)
         PLATFORM="mac";
         PLATFORM_NAME="mac";
         EXT=""
+        SEP=":";
         ;;
     CYGWIN*)
         PLATFORM="win";
         PLATFORM_NAME="windows";
         EXT=".exe";
         DIR="."
+        SEP=";";
         ;;
     *)          
         echo "ERROR: Unsupported platform '$unameOut'." >&2;
@@ -669,7 +672,7 @@ function check_edge {
     {
         \"edgeHtmlVersion\": \"$EDGE_HTML_VERSION\",
         \"version\": \"$EDGE_VERSION\",
-        \"browserName\": \"edge\",
+        \"browserName\": \"MicrosoftEdge\",
         \"platformName\": \"$PLATFORM_NAME\",
         \"maxInstances\": $MAXINSTANCES,
         \"seleniumProtocol\": \"WebDriver\",
@@ -763,7 +766,7 @@ if [[ $ROLE = "hub" ]]; then
             "servlets" : [],
             "withoutServlets": [],
             "custom": {},
-            "capabilityMatcher": "org.openqa.grid.internal.utils.DefaultCapabilityMatcher",
+            "capabilityMatcher": "EdgeCapabilityMatcher",
             "registry": "org.openqa.grid.internal.DefaultGridRegistry",
             "throwOnCapabilityNotPresent": true,
             "cleanUpCycle": 5000,
@@ -842,9 +845,12 @@ else
     DEBUG=""
 fi
 
+echo "========================== Building EdgeCapability Matcher: =========================="
+javac -classpath ${JAR#"$DIR/"} $DIR/java/EdgeCapabilityMatcher.java
+
+semver_version "$JAR" "SELENIUM_VERSION"
 echo "========================== Running Command: =========================="
-echo java $JAVA_ARGS-jar "$JAR" -role "$ROLE" -log "$DIR/logs/$NAME-server-$SELENIUM_VERSION.log" -host "$ADDRESS" -port "$PORT" $CONFIG $DEBUG $HUB
+echo java $JAVA_ARGS-cp "$JAR""$SEP""$DIR/java/" org.openqa.grid.selenium.GridLauncherV3 -role "$ROLE" -log "$DIR/logs/$NAME-server-$SELENIUM_VERSION.log" -host "$ADDRESS" -port "$PORT" $CONFIG $DEBUG $HUB
 
 echo "========================== Server type: $ROLE =========================="
-semver_version "$JAR" "SELENIUM_VERSION"
-java $JAVA_ARGS-jar "$JAR" -role "$ROLE" -log "$DIR/logs/$NAME-server-$SELENIUM_VERSION.log" -host "$ADDRESS" -port "$PORT" $CONFIG $DEBUG $HUB
+java $JAVA_ARGS-cp "$JAR""$SEP""$DIR/java/" org.openqa.grid.selenium.GridLauncherV3 -role "$ROLE" -log "$DIR/logs/$NAME-server-$SELENIUM_VERSION.log" -host "$ADDRESS" -port "$PORT" $CONFIG $DEBUG $HUB
